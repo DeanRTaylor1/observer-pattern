@@ -57,6 +57,7 @@ class Publisher implements IPublisher {
     }
   }
 }
+
 interface SubscriberConfig<T> {
   name: string;
   initialState: object;
@@ -75,9 +76,9 @@ class Subscriber<T> {
   constructor(config: SubscriberConfig<T>) {
     this.name = config.name;
     this.state = config.initialState;
-    this.next = config.onNext;
-    this.error = config.onError;
-    this.complete = config.onComplete;
+    this.next = config.onNext.bind(this);
+    this.error = config.onError.bind(this);
+    this.complete = config.onComplete.bind(this);
   }
 
   unsubscribeFromPublisher(publisher: Publisher, subject: Subject): void {
@@ -100,17 +101,17 @@ type NewsUpdate = { headline: string; content: string; count: number };
 const sportsFan = new Subscriber<NewsUpdate>({
   name: "SportsFan",
   initialState: { count: 0, limit: 10 },
-  onNext: function (this: Subscriber<NewsUpdate>, data) {
+  onNext(data) {
     console.log(`[${this.name}] Received: ${data.payload.headline}`);
     this.state.count += data.payload.count;
     if (this.state.count >= this.state.limit) {
       this.complete(Subject.Sports);
     }
   },
-  onError: function (this: Subscriber<NewsUpdate>, err) {
+  onError(err) {
     console.error(`[${this.name}] Error:`, err);
   },
-  onComplete: function (this: Subscriber<NewsUpdate>, subject: Subject) {
+  onComplete() {
     this.unsubscribeFromPublisher(newsAgency, Subject.Sports);
     console.log(`[${this.name}] Unsubscribed from sports news`);
   },
@@ -119,17 +120,17 @@ const sportsFan = new Subscriber<NewsUpdate>({
 const politicalAnalyst = new Subscriber<NewsUpdate>({
   name: "PoliticalAnalyst",
   initialState: { articleCount: 0, limit: 5 },
-  onNext: function (this: Subscriber<NewsUpdate>, data) {
+  onNext(data) {
     console.log(`[${this.name}] Political update: ${data.payload.headline}`);
     this.state.articleCount += 1;
     if (this.state.articleCount >= this.state.limit) {
       this.complete(Subject.Politics);
     }
   },
-  onError: function (this: Subscriber<NewsUpdate>, err) {
+  onError(err) {
     console.error(`[${this.name}] Error:`, err);
   },
-  onComplete: function (this: Subscriber<NewsUpdate>) {
+  onComplete() {
     this.unsubscribeFromPublisher(newsAgency, Subject.Politics);
     console.log(`[${this.name}] Unsubscribed from political news`);
   },
