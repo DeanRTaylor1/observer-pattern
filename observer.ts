@@ -1,20 +1,34 @@
+import { Subscriber } from "./subscriber";
+
+/**
+ * Interface representing the publisher in the Observer pattern.
+ */
 interface IPublisher {
   subscribe(subject: Subject, subscriber: Subscriber<any>): void;
   unsubscribe(subject: Subject, subscriber: Subscriber<any>): void;
   notify<T>(subject: Subject, data: EventData<T>): void;
 }
 
+/**
+ * Defines the structure of event data.
+ */
 interface EventData<T> {
   type: string;
   payload: T;
   timestamp?: Date;
 }
 
+/**
+ * Enum for the different types of subjects that can be observed.
+ */
 enum Subject {
   Sports = "sports",
   Politics = "politics",
 }
 
+/**
+ * Implements the IPublisher interface to manage subscribers and notifications.
+ */
 class Publisher implements IPublisher {
   private observers: Map<Subject, Array<Subscriber<any>>>;
 
@@ -22,19 +36,33 @@ class Publisher implements IPublisher {
     this.observers = new Map();
   }
 
+  /**
+   * Subscribes a new subscriber to a specific subject.
+   * @param {Subject} subject - The subject to subscribe to.
+   * @param {Subscriber<T>} subscriber - The subscriber object.
+   */
   public subscribe<T>(subject: Subject, subscriber: Subscriber<T>): void {
     if (!this.observers.has(subject)) {
       this.observers.set(subject, []);
     }
 
     const subscribers = this.observers.get(subject);
-    if (!subscribers!.includes(subscriber)) {
-      subscribers!.push(subscriber);
+    if (subscribers) {
+      if (!subscribers.includes(subscriber)) {
+        subscribers.push(subscriber);
+      } else {
+        console.error("Attempted to subscribe an already subscribed observer.");
+      }
     } else {
-      console.error("Attempted to subscribe an already subscribed observer.");
+      console.error("Failed to retrieve subscribers for subject.");
     }
   }
 
+  /**
+   * Unsubscribes a subscriber from a specific subject.
+   * @param {Subject} subject - The subject to unsubscribe from.
+   * @param {Subscriber<T>} subscriber - The subscriber object to remove.
+   */
   public unsubscribe<T>(subject: Subject, subscriber: Subscriber<T>): void {
     const subscribers = this.observers.get(subject);
     if (subscribers) {
@@ -48,6 +76,11 @@ class Publisher implements IPublisher {
     }
   }
 
+  /**
+   * Notifies all subscribers of a specific subject with the given data.
+   * @param {Subject} subject - The subject of the event.
+   * @param {EventData<T>} data - The data to be sent to subscribers.
+   */
   public notify<T>(subject: Subject, data: EventData<T>): void {
     const subscribers = this.observers.get(subject);
     if (subscribers) {
@@ -58,137 +91,4 @@ class Publisher implements IPublisher {
   }
 }
 
-interface SubscriberConfig<T> {
-  name: string;
-  initialState: object;
-  onNext: (this: Subscriber<T>, data: EventData<T>) => void;
-  onError: (this: Subscriber<T>, err: Error) => void;
-  onComplete: (this: Subscriber<T>, subject: Subject) => void;
-}
-
-class Subscriber<T> {
-  readonly name: string;
-  state: any;
-  next: (data: EventData<T>) => void;
-  error: (err: Error) => void;
-  complete: (subject: Subject) => void;
-
-  constructor(config: SubscriberConfig<T>) {
-    this.name = config.name;
-    this.state = config.initialState;
-    this.next = config.onNext.bind(this);
-    this.error = config.onError.bind(this);
-    this.complete = config.onComplete.bind(this);
-  }
-
-  unsubscribeFromPublisher(publisher: Publisher, subject: Subject): void {
-    publisher.unsubscribe(subject, this);
-  }
-}
-
-const observable = new Publisher();
-
-type eventData = { count: number };
-
-const genRandNum = (x: number) => {
-  return Math.floor(Math.random() * x);
-};
-
-const newsAgency = new Publisher();
-
-type NewsUpdate = { headline: string; content: string; count: number };
-
-const sportsFan = new Subscriber<NewsUpdate>({
-  name: "SportsFan",
-  initialState: { count: 0, limit: 10 },
-  onNext(data) {
-    console.log(`[${this.name}] Received: ${data.payload.headline}`);
-    this.state.count += data.payload.count;
-    if (this.state.count >= this.state.limit) {
-      this.complete(Subject.Sports);
-    }
-  },
-  onError(err) {
-    console.error(`[${this.name}] Error:`, err);
-  },
-  onComplete() {
-    this.unsubscribeFromPublisher(newsAgency, Subject.Sports);
-    console.log(`[${this.name}] Unsubscribed from sports news`);
-  },
-});
-
-const politicalAnalyst = new Subscriber<NewsUpdate>({
-  name: "PoliticalAnalyst",
-  initialState: { articleCount: 0, limit: 5 },
-  onNext(data) {
-    console.log(`[${this.name}] Political update: ${data.payload.headline}`);
-    this.state.articleCount += 1;
-    if (this.state.articleCount >= this.state.limit) {
-      this.complete(Subject.Politics);
-    }
-  },
-  onError(err) {
-    console.error(`[${this.name}] Error:`, err);
-  },
-  onComplete() {
-    this.unsubscribeFromPublisher(newsAgency, Subject.Politics);
-    console.log(`[${this.name}] Unsubscribed from political news`);
-  },
-});
-
-newsAgency.subscribe<NewsUpdate>(Subject.Sports, sportsFan);
-newsAgency.subscribe<NewsUpdate>(Subject.Politics, politicalAnalyst);
-
-const sportsNews = [
-  {
-    headline: "Team wins championship!",
-    content: "Team X won against Team Y.",
-    count: 1,
-  },
-  {
-    headline: "Player sets new record!",
-    content: "Player A sets new scoring record.",
-    count: 1,
-  },
-  {
-    headline: "Upcoming match scheduled!",
-    content: "Team A will play against Team B.",
-    count: 1,
-  },
-  {
-    headline: "Injury update on key player!",
-    content: "Player B is recovering well.",
-    count: 1,
-  },
-];
-
-const politicalNews = [
-  {
-    headline: "Election results announced!",
-    content: "Party A wins majority.",
-    count: 1,
-  },
-  {
-    headline: "New policy introduced!",
-    content: "Government introduces new law.",
-    count: 1,
-  },
-];
-
-sportsNews.forEach((update, index) => {
-  setTimeout(() => {
-    newsAgency.notify<NewsUpdate>(Subject.Sports, {
-      type: "NewsUpdate",
-      payload: update,
-    });
-  }, index * 2000);
-});
-
-politicalNews.forEach((update, index) => {
-  setTimeout(() => {
-    newsAgency.notify<NewsUpdate>(Subject.Politics, {
-      type: "NewsUpdate",
-      payload: update,
-    });
-  }, index * 3000);
-});
+export { Publisher, EventData, Subject };
